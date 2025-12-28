@@ -1021,10 +1021,18 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
 
     dff["occ_raw"] = dff[occ_col].astype(float)
 
-    # Aggregate by vej_id first to handle duplicates within same year/month
-    # (some vej_id values map to multiple vejnavn)
+    # Aggregate by vej_id to get max occupancy per street, handling duplicate street IDs
+    # For rows with NaN vej_id, create unique identifiers using index
+    dff_with_id = dff.copy()
+    nan_mask = dff_with_id["vej_id"].isna()
+    dff_with_id.loc[nan_mask, "vej_id"] = "nan_" + dff_with_id.loc[
+        nan_mask
+    ].index.astype(str)
+
     dff_agg = (
-        dff.groupby("vej_id").agg({"occ_raw": "max", "vejnavn": "first"}).reset_index()
+        dff_with_id.groupby("vej_id")
+        .agg({"occ_raw": "max", "vejnavn": "first"})
+        .reset_index()
     )
 
     over = dff_agg[dff_agg["occ_raw"] > 100].copy()
