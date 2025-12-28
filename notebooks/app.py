@@ -1,5 +1,6 @@
-from dash import Dash, dcc, html
+from dash import Dash, dcc, html, callback_context
 from dash.dependencies import Input, Output
+import dash.exceptions
 
 import pandas as pd
 import numpy as np
@@ -573,12 +574,22 @@ def get_year_breakdown(selected_year):
         Input("year-dropdown", "value"),
         Input("month-dropdown", "value"),
         Input("occ-slider", "value"),
+        Input("map-graph", "clickData"),
+        Input("overflow-chart", "clickData"),
+        Input("capacity-breakdown-chart", "clickData"),
     ],
 )
 
 # 4 update-functions
-
-def update_map(selected_time, selected_year, selected_month, occ_range):
+def update_map(
+    selected_time,
+    selected_year,
+    selected_month,
+    occ_range,
+    mapClick,
+    overflowClick,
+    breakdownClick,
+):
     cfg = TIME_CONFIG[selected_time]
     occ_col = cfg["occ_col"]
     cap_col = cfg["cap_col"]
@@ -684,13 +695,57 @@ def update_map(selected_time, selected_year, selected_month, occ_range):
         )
     )
 
+    # Determine map center based on clicked street
+    center_lat = 55.69
+    center_lon = 12.5683
+    zoom = 11
+
+    ctx = callback_context
+    if ctx.triggered:
+        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+        vej_id = None
+        street_name = None
+
+        if trigger_id == "capacity-breakdown-chart" and breakdownClick is not None:
+            try:
+                street_name = breakdownClick["points"][0]["y"]
+            except Exception:
+                street_name = None
+        elif trigger_id == "overflow-chart" and overflowClick is not None:
+            try:
+                street_name = overflowClick["points"][0]["customdata"]
+            except Exception:
+                street_name = None
+        elif trigger_id == "map-graph" and mapClick is not None:
+            try:
+                vej_id = mapClick["points"][0]["customdata"]
+            except Exception:
+                vej_id = None
+
+        # Find the street in the dataframe
+        street_data = None
+        if street_name is not None:
+            street_data = df[df["vejnavn"] == street_name]
+        elif vej_id is not None:
+            # Handle the case where vej_id might be NaN
+            if isinstance(vej_id, str) and vej_id.startswith("nan_"):
+                street_data = df[df["vej_id"].isna()]
+            else:
+                street_data = df[df["vej_id"] == vej_id]
+
+        if street_data is not None and not street_data.empty:
+            center_lat = street_data["lat"].iloc[0]
+            center_lon = street_data["lng"].iloc[0]
+            zoom = 16
+
     fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
         mapbox=dict(
             accesstoken=MAPBOX_TOKEN,
             style="carto-positron",
-            zoom=11,
-            center=dict(lat=55.69, lon=12.5683),  # Copenhagen center
+            zoom=zoom,
+            center=dict(lat=center_lat, lon=center_lon),
         ),
         uirevision="parking-map",
     )
@@ -713,6 +768,13 @@ def update_map(selected_time, selected_year, selected_month, occ_range):
     ],
 )
 def update_street_timeseries(mapClick, overflowClick, breakdownClick):
+    # Get which input triggered the callback
+    ctx = callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
     # If nothing clicked yet
     if overflowClick is None and mapClick is None and breakdownClick is None:
         fig = go.Figure()
@@ -733,23 +795,21 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick):
         )
         return fig
 
-    # Prefer breakdown click, then overflow chart click, then map click
+    # Use the triggered input to determine which click to process
     vej_id = None
     street_name = None
 
-    if breakdownClick is not None:
+    if trigger_id == "capacity-breakdown-chart" and breakdownClick is not None:
         try:
             street_name = breakdownClick["points"][0]["y"]
         except Exception:
             street_name = None
-
-    if vej_id is None and overflowClick is not None:
+    elif trigger_id == "overflow-chart" and overflowClick is not None:
         try:
             street_name = overflowClick["points"][0]["customdata"]
         except Exception:
             street_name = None
-
-    if vej_id is None and mapClick is not None:
+    elif trigger_id == "map-graph" and mapClick is not None:
         try:
             vej_id = mapClick["points"][0]["customdata"]
         except Exception:
@@ -836,7 +896,9 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick):
                     name=label,
                     line=dict(color=colors[label], width=2),
                     marker=dict(size=8, color=colors[label]),
+                    customdata=dff_street["month"].astype(int),
                     hovertemplate=("%{x|%b %Y}<br>Occupancy: %{y:.0f}%<extra></extra>"),
+                    meta={"time": t},
                 )
             )
             max_y = max(max_y, y.max())
@@ -1125,6 +1187,32 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
     )
 
     return fig
+
+
+@app.callback(
+    [
+        Output("time-dropdown", "value"),
+        Output("month-dropdown", "value"),
+    ],
+    Input("street-timeseries", "clickData"),
+)
+def update_filters_from_timeseries(clickData):
+    """Update time and month dropdowns when clicking on the trend view."""
+    if clickData is None:
+        raise dash.exceptions.PreventUpdate
+
+    try:
+        # Get the time from the trace metadata
+        trace_index = clickData["points"][0]["curveNumber"]
+        time_values = ["12", "17", "22"]
+        selected_time = time_values[trace_index]
+
+        # Get the month from customdata
+        selected_month = int(clickData["points"][0]["customdata"])
+
+        return selected_time, selected_month
+    except (KeyError, IndexError, ValueError, TypeError):
+        raise dash.exceptions.PreventUpdate
 
 
 if __name__ == "__main__":
