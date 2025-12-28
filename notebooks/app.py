@@ -875,6 +875,7 @@ def update_breakdown(clickData, selected_year):
                 "color": COLOR_SCHEME["primary"],
                 "fontSize": "14px",
                 "fontWeight": "600",
+                "margin": "0 0 5px 0",
             }
             return title, h3_style, empty_fig
 
@@ -916,7 +917,7 @@ def update_breakdown(clickData, selected_year):
     fig.update_layout(
         xaxis_title="Change in parking spots",
         yaxis_title="",
-        margin=dict(l=80, r=20, t=20, b=40),
+        margin=dict(l=150, r=20, t=20, b=40),
         yaxis=dict(autorange="reversed", automargin=True, tickfont=dict(size=12)),
         hovermode="closest",
     )
@@ -927,6 +928,7 @@ def update_breakdown(clickData, selected_year):
         "color": COLOR_SCHEME["primary"],
         "fontSize": "14px",
         "fontWeight": "600",
+        "margin": "0 0 5px 0",
     }
     return title, h3_style, fig
 
