@@ -1,0 +1,120 @@
+/* ============= GLOBAL FONT ======================= */
+body,
+div,
+p,
+span,
+h1,
+h2,
+h3,
+h4,
+label {
+    font-family: "Open Sans", sans-serif;
+}
+
+/* ============= LEFT SIDEBAR ====================== */
+
+.div-user-controls {
+    background-color: #1f1f1f;
+    /* dark sidebar */
+    color: #ffffff;
+    padding: 25px;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid #444;
+}
+
+.div-user-controls h2 {
+    color: #ffffff;
+    margin-top: 0;
+}
+
+.div-user-controls p,
+.div-user-controls label {
+    color: #f0f0f0;
+}
+
+/* ============= DROPDOWNS IN SIDEBAR ============== */
+
+/* Main dropdown box */
+.div-user-controls .Select-control {
+    background-color: #333 !important;
+    border-color: #444 !important;
+    color: #ffffff !important;
+}
+
+/* Selected value label */
+.div-user-controls .has-value.Select--single>.Select-control .Select-value .Select-value-label {
+    color: #ffffff !important;
+}
+
+/* Placeholder text */
+.div-user-controls .Select-placeholder {
+    color: #cccccc !important;
+}
+
+/* Dropdown menu */
+.div-user-controls .Select-menu-outer {
+    background-color: #333 !important;
+    color: #ffffff !important;
+    border-color: #444 !important;
+}
+
+/* Options */
+.div-user-controls .Select-option {
+    background-color: #333;
+    color: #ffffff;
+}
+
+.div-user-controls .Select-option.is-focused {
+    background-color: #444;
+}
+
+/* Arrow icon white */
+.div-user-controls .Select-arrow {
+    border-top-color: #ffffff !important;
+}
+
+/* Slider tick labels light */
+.rc-slider-mark-text {
+    color: #cccccc !important;
+}
+
+/* ============= RIGHT COLUMN (OPTIONAL TWEAK) ===== */
+
+.eight.columns {
+    background-color: #ffffff;
+}
+
+/* ============= MAPBOX CONTROLS =================== */
+
+/* Hide Mapbox logo entirely */
+.mapboxgl-ctrl-logo {
+    display: none !important;
+}
+
+/* Clean, flat attribution container */
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-attrib {
+    background-color: rgba(255, 255, 255, 0) !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 2px 4px !important;
+}
+
+/* Hide the little compact attribution button box */
+.mapboxgl-ctrl-attrib-button {
+    display: none !important;
+}
+
+/* Text should exist but be invisible until hover */
+.mapboxgl-ctrl-attrib-inner {
+    opacity: 0;
+    /* hidden by default */
+    white-space: nowrap;
+    /* keep it on one line */
+    transition: opacity 0.2s ease;
+}
+
+/* When you hover the area, show the text */
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-attrib:hover .mapboxgl-ctrl-attrib-inner {
+    opacity: 1;
+}
