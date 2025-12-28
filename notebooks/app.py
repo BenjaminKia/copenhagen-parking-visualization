@@ -1056,7 +1056,7 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
     )
 
     fig.update_layout(
-        xaxis_title="Raw occupancy (%)",
+        xaxis_title="Occupancy (%)",
         yaxis=dict(
             autorange="reversed",
             showgrid=True,
