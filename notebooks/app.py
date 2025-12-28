@@ -744,7 +744,12 @@ def update_street_timeseries(mapClick, overflowClick):
             vej_id = mapClick["points"][0]["customdata"]
         except Exception:
             vej_id = None
-    dff_street = df[df["vej_id"] == vej_id].copy()
+
+    # Handle NaN vej_id (e.g., Sankt Kjelds Plads)
+    if pd.isna(vej_id):
+        dff_street = df[df["vej_id"].isna()].copy()
+    else:
+        dff_street = df[df["vej_id"] == vej_id].copy()
     if dff_street.empty:
         fig = go.Figure()
         fig.update_layout(
