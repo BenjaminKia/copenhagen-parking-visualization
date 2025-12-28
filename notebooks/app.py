@@ -304,12 +304,12 @@ app.layout = html.Div(
                         html.Div(
                             style={"flex": "1"},
                             children=[
-                                dcc.Slider(
+                                dcc.RangeSlider(
                                     id="occ-slider",
                                     min=0,
                                     max=100,
                                     step=5,
-                                    value=100,
+                                    value=[0, 100],
                                     marks={i: f"{i}%" for i in range(0, 101, 20)},
                                     tooltip={
                                         "placement": "bottom",
@@ -578,10 +578,12 @@ def get_year_breakdown(selected_year):
 
 # 4 update-functions
 
-def update_map(selected_time, selected_year, selected_month, max_occ):
+def update_map(selected_time, selected_year, selected_month, occ_range):
     cfg = TIME_CONFIG[selected_time]
     occ_col = cfg["occ_col"]
     cap_col = cfg["cap_col"]
+
+    min_occ, max_occ = occ_range
 
     # Filter by year + month
     dff = df.copy()
@@ -610,8 +612,8 @@ def update_map(selected_time, selected_year, selected_month, max_occ):
     occ = dff[occ_col].astype(float).clip(lower=0, upper=100)
     capacity = dff[cap_col].astype(float)
 
-    # Apply max occupancy filter
-    mask = occ <= max_occ
+    # Apply occupancy range filter
+    mask = (occ >= min_occ) & (occ <= max_occ)
     dff = dff[mask]
     occ = occ[mask]
     capacity = capacity[mask]
@@ -637,15 +639,20 @@ def update_map(selected_time, selected_year, selected_month, max_occ):
     else:
         sizes = 5 + 25 * (capacity - min_cap) / (max_cap - min_cap)
 
-    # Build hover text
+    # Build hover text with dynamic label for occupancy
+    occ_raw = dff[occ_col].astype(float)  # Get raw occupancy values
+    occ_label = occ_raw.apply(lambda x: "Raw occupancy:" if x > 100 else "Occupancy:")
+
     hover_text = (
         "Street: "
         + dff["vejnavn"].astype(str)
         # + "<br>Street ID: "
         # + dff["vej_id"].astype(str)
         + f"<br>Time: {cfg['label']}"
-        + "<br>Occupancy: "
-        + occ.round(1).astype(str)
+        + "<br>"
+        + occ_label
+        + " "
+        + occ_raw.round(1).astype(str)
         + " %"
         + "<br>Capacity: "
         + capacity.astype(int).astype(str)
@@ -812,16 +819,19 @@ def update_street_timeseries(mapClick, overflowClick):
     max_y = max(max_y, 10)
     max_y = max_y * 1.05  # visual padding
 
-    # street_name = (
-    #    dff_street["vejnavn"].iloc[0] if "vejnavn" in dff_street.columns else ""
-    # )
-    # title = f"Occupancy over time - {street_name} (vej_id={vej_id})"
+    street_name = (
+        dff_street["vejnavn"].iloc[0] if "vejnavn" in dff_street.columns else ""
+    )
 
     fig = go.Figure(data=traces)
     fig.update_layout(
+        title=street_name,
+        title_font_size=16,
+        title_x=0.05,
+        title_xanchor="left",
         xaxis_title="Date",
         yaxis_title="Occupancy (%)",
-        margin=dict(l=50, r=20, t=10, b=50),
+        margin=dict(l=50, r=20, t=40, b=50),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1010,7 +1020,14 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
         return fig
 
     dff["occ_raw"] = dff[occ_col].astype(float)
-    over = dff[dff["occ_raw"] > 100].copy()
+
+    # Aggregate by vej_id first to handle duplicates within same year/month
+    # (some vej_id values map to multiple vejnavn)
+    dff_agg = (
+        dff.groupby("vej_id").agg({"occ_raw": "max", "vejnavn": "first"}).reset_index()
+    )
+
+    over = dff_agg[dff_agg["occ_raw"] > 100].copy()
     if over.empty:
         fig = go.Figure()
         fig.update_layout(
@@ -1027,13 +1044,8 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
         )
         return fig
 
-    # Aggregate per street (vej_id)
-    agg = (
-        over.groupby("vej_id")
-        .agg({"occ_raw": "max", "vejnavn": "first"})
-        .reset_index()
-        .sort_values("occ_raw", ascending=False)
-    )
+    # Aggregate per street (vej_id) and sort
+    agg = over.sort_values("occ_raw", ascending=False)
     top = agg.head(30)
 
     fig = go.Figure()
@@ -1045,8 +1057,8 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
             marker=dict(
                 color=top["occ_raw"],
                 colorscale=[
-                    [0.0, "#A8D4F0"],  # lighter blue
-                    [1.0, "#1F4E79"],  # dark blue (matches occupancy trend)
+                    [0.0, "#F8B8C4"],  # lighter red
+                    [1.0, "#C41E3A"],  # dark red (similar to blue contrast)
                 ],
                 showscale=False,
             ),
