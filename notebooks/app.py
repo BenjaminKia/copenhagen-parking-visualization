@@ -887,8 +887,8 @@ def update_breakdown(clickData, selected_year):
     losers = merged[merged["change"] < 0].nsmallest(10, "change")
     gainers = merged[merged["change"] > 0].nlargest(10, "change")
 
-    # Combine and sort
-    combined = pd.concat([losers, gainers]).sort_values("change")
+    # Combine and sort - gainers above losers (descending order)
+    combined = pd.concat([losers, gainers]).sort_values("change", ascending=False)
 
     if combined.empty:
         empty_fig = go.Figure()
@@ -904,7 +904,7 @@ def update_breakdown(clickData, selected_year):
             orientation="h",
             marker=dict(
                 color=combined["change"],
-                colorscale="RdYlGn",
+                colorscale=[[0, "#E67E22"], [0.5, "#D3D3D3"], [1, "#2E86AB"]],
                 cmid=0,
                 showscale=False,
             ),
