@@ -120,6 +120,11 @@ def make_capacity_figure():
         ),
         showlegend=False,
     )
+
+    fig.update_traces(
+        line=dict(color="#E67E22", width=2.5), fillcolor="rgba(230, 126, 34, 0.18)"
+    )
+
     return fig
 
 
@@ -776,8 +781,12 @@ def update_street_timeseries(mapClick, overflowClick):
     # build time series (12, 17, 22)
     traces = []
     max_y = 0  # to scale y-axis depending on occupancy of that street
-    colors = ["#2E86AB", "#E67E22", "#06A77D"]  # Blue, Orange, Green
-    for i, t in enumerate(["12", "17", "22"]):
+    colors = {
+        "12:00": "#1F4E79",  # blue
+        "17:00": "#E67E22",  # orange
+        "22:00": "#1ABC9C",  # teal
+    }
+    for t in ["12", "17", "22"]:
         occ_col = TIME_CONFIG[t]["occ_col"]
         label = TIME_CONFIG[t]["label"]
 
@@ -789,8 +798,8 @@ def update_street_timeseries(mapClick, overflowClick):
                     y=y,
                     mode="lines+markers",
                     name=label,
-                    line=dict(color=colors[i], width=2),
-                    marker=dict(size=8, color=colors[i]),
+                    line=dict(color=colors[label], width=2),
+                    marker=dict(size=8, color=colors[label]),
                     hovertemplate=("%{x|%b %Y}<br>Occupancy: %{y:.0f}%<extra></extra>"),
                 )
             )
@@ -803,17 +812,16 @@ def update_street_timeseries(mapClick, overflowClick):
     max_y = max(max_y, 10)
     max_y = max_y * 1.05  # visual padding
 
-    street_name = (
-        dff_street["vejnavn"].iloc[0] if "vejnavn" in dff_street.columns else ""
-    )
-    title = f"Occupancy over time - {street_name} (vej_id={vej_id})"
+    # street_name = (
+    #    dff_street["vejnavn"].iloc[0] if "vejnavn" in dff_street.columns else ""
+    # )
+    # title = f"Occupancy over time - {street_name} (vej_id={vej_id})"
 
     fig = go.Figure(data=traces)
     fig.update_layout(
-        title=title,
         xaxis_title="Date",
         yaxis_title="Occupancy (%)",
-        yaxis=dict(range=[-10, max_y]),
+        margin=dict(l=50, r=20, t=10, b=50),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1034,7 +1042,14 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
             x=top["occ_raw"].astype(float),
             y=top["vejnavn"].astype(str),
             orientation="h",
-            marker=dict(color="#8B5CF6"),
+            marker=dict(
+                color=top["occ_raw"],
+                colorscale=[
+                    [0.0, "#A8D4F0"],  # lighter blue
+                    [1.0, "#1F4E79"],  # dark blue (matches occupancy trend)
+                ],
+                showscale=False,
+            ),
             customdata=top["vej_id"].astype(str).tolist(),
             hovertemplate="<b>%{y}</b><br>Occupancy: %{x:.1f}%<extra></extra>",
         )
