@@ -453,10 +453,42 @@ app.layout = html.Div(
                                 ),
                             ],
                         ),
-                        # Cell 3: Breakdown
+                        # Cell 3: Streets with occupancy > 100%
                         html.Div(
                             style={
                                 "borderRight": f"1px solid {COLOR_SCHEME['border']}",
+                                "overflow": "hidden",
+                                "display": "flex",
+                                "flexDirection": "column",
+                            },
+                            children=[
+                                html.Div(
+                                    style={
+                                        "padding": "15px 20px",
+                                        "backgroundColor": COLOR_SCHEME["neutral"],
+                                    },
+                                    children=[
+                                        html.H3(
+                                            "Streets >100% Occupancy",
+                                            style={
+                                                "color": COLOR_SCHEME["primary"],
+                                                "margin": "0 0 5px 0",
+                                                "fontSize": "14px",
+                                                "fontWeight": "600",
+                                            },
+                                        )
+                                    ],
+                                ),
+                                dcc.Graph(
+                                    id="overflow-chart",
+                                    style={"height": "45vh", "margin": "0"},
+                                    config={"displaylogo": False},
+                                ),
+                            ],
+                        ),
+                        # Cell 4: Breakdown
+                        html.Div(
+                            style={
                                 "overflow": "hidden",
                                 "display": "flex",
                                 "flexDirection": "column",
@@ -482,38 +514,6 @@ app.layout = html.Div(
                                 ),
                                 dcc.Graph(
                                     id="capacity-breakdown-chart",
-                                    style={"height": "45vh", "margin": "0"},
-                                    config={"displaylogo": False},
-                                ),
-                            ],
-                        ),
-                        # Cell 4: Streets with occupancy > 100%
-                        html.Div(
-                            style={
-                                "overflow": "hidden",
-                                "display": "flex",
-                                "flexDirection": "column",
-                            },
-                            children=[
-                                html.Div(
-                                    style={
-                                        "padding": "15px 20px",
-                                        "backgroundColor": COLOR_SCHEME["neutral"],
-                                    },
-                                    children=[
-                                        html.H3(
-                                            "Streets >100% Occupancy",
-                                            style={
-                                                "color": COLOR_SCHEME["primary"],
-                                                "margin": "0 0 5px 0",
-                                                "fontSize": "14px",
-                                                "fontWeight": "600",
-                                            },
-                                        )
-                                    ],
-                                ),
-                                dcc.Graph(
-                                    id="overflow-chart",
                                     style={"height": "45vh", "margin": "0"},
                                     config={"displaylogo": False},
                                 ),
@@ -709,11 +709,12 @@ def update_map(selected_time, selected_year, selected_month, occ_range):
     [
         Input("map-graph", "clickData"),
         Input("overflow-chart", "clickData"),
+        Input("capacity-breakdown-chart", "clickData"),
     ],
 )
-def update_street_timeseries(mapClick, overflowClick):
+def update_street_timeseries(mapClick, overflowClick, breakdownClick):
     # If nothing clicked yet
-    if overflowClick is None and mapClick is None:
+    if overflowClick is None and mapClick is None and breakdownClick is None:
         fig = go.Figure()
         fig.update_layout(
             xaxis_title="Date",
@@ -732,22 +733,45 @@ def update_street_timeseries(mapClick, overflowClick):
         )
         return fig
 
-    # Prefer overflow chart click (explicit list); fallback to map click
+    # Prefer breakdown click, then overflow chart click, then map click
     vej_id = None
-    if overflowClick is not None:
+    street_name = None
+
+    if breakdownClick is not None:
         try:
-            vej_id = overflowClick["points"][0]["customdata"]
+            street_name = breakdownClick["points"][0]["y"]
         except Exception:
-            vej_id = None
+            street_name = None
+
+    if vej_id is None and overflowClick is not None:
+        try:
+            street_name = overflowClick["points"][0]["customdata"]
+        except Exception:
+            street_name = None
+
     if vej_id is None and mapClick is not None:
         try:
             vej_id = mapClick["points"][0]["customdata"]
         except Exception:
             vej_id = None
 
+    # If we have a street name from breakdown click, find the vej_id
+    if street_name is not None and vej_id is None:
+        vejname_match = df[df["vejnavn"] == street_name]
+        if not vejname_match.empty:
+            vej_id = vejname_match["vej_id"].iloc[0]
+
     # Handle NaN vej_id (e.g., Sankt Kjelds Plads)
-    if pd.isna(vej_id):
+    # Check if vej_id is the special "nan_" string used for NaN vej_id in overflow chart
+    is_nan_vej_id = pd.isna(vej_id) or (
+        isinstance(vej_id, str) and vej_id.startswith("nan_")
+    )
+
+    if is_nan_vej_id:
         dff_street = df[df["vej_id"].isna()].copy()
+        # If we have a street name, filter to just that street
+        if street_name is not None:
+            dff_street = dff_street[dff_street["vejnavn"] == street_name].copy()
     else:
         dff_street = df[df["vej_id"] == vej_id].copy()
     if dff_street.empty:
@@ -1075,7 +1099,7 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
                 ],
                 showscale=False,
             ),
-            customdata=top["vej_id"].astype(str).tolist(),
+            customdata=top["vejnavn"].astype(str).tolist(),
             hovertemplate="<b>%{y}</b><br>Occupancy: %{x:.1f}%<extra></extra>",
         )
     )
