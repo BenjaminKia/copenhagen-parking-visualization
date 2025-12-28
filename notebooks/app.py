@@ -84,14 +84,14 @@ def make_capacity_figure():
             x=cap_by_year["year"],
             y=cap_by_year["total_spots"],
             mode="lines+markers",
-            line=dict(color=COLOR_SCHEME["primary"], width=3),
+            line=dict(color="#E67E22", width=3),
             marker=dict(
                 size=10,
-                color=COLOR_SCHEME["primary"],
+                color="#E67E22",
                 line=dict(width=2, color="white"),
             ),
             fill="tozeroy",
-            fillcolor="rgba(46, 134, 171, 0.1)",
+            fillcolor="rgba(230, 126, 34, 0.15)",
             hovertemplate="<b>Year %{x}</b><br>Total spots: %{y:,.0f}<extra></extra>",
             name="Total parking spots",
         )
@@ -776,7 +776,8 @@ def update_street_timeseries(mapClick, overflowClick):
     # build time series (12, 17, 22)
     traces = []
     max_y = 0  # to scale y-axis depending on occupancy of that street
-    for t in ["12", "17", "22"]:
+    colors = ["#2E86AB", "#E67E22", "#06A77D"]  # Blue, Orange, Green
+    for i, t in enumerate(["12", "17", "22"]):
         occ_col = TIME_CONFIG[t]["occ_col"]
         label = TIME_CONFIG[t]["label"]
 
@@ -788,7 +789,8 @@ def update_street_timeseries(mapClick, overflowClick):
                     y=y,
                     mode="lines+markers",
                     name=label,
-                    marker=dict(size=8),
+                    line=dict(color=colors[i], width=2),
+                    marker=dict(size=8, color=colors[i]),
                     hovertemplate=("%{x|%b %Y}<br>Occupancy: %{y:.0f}%<extra></extra>"),
                 )
             )
@@ -1002,7 +1004,7 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
             x=top["occ_raw"].astype(float),
             y=top["vejnavn"].astype(str),
             orientation="h",
-            marker=dict(color=COLOR_SCHEME["accent"]),
+            marker=dict(color="#8B5CF6"),
             customdata=top["vej_id"].astype(str).tolist(),
             hovertemplate="<b>%{y}</b><br>Occupancy: %{x:.1f}%<extra></extra>",
         )
