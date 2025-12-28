@@ -103,8 +103,8 @@ def make_capacity_figure():
         yaxis_title="Number of parking spots",
         hovermode="x unified",
         margin=dict(l=50, r=20, t=20, b=50),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
         font=dict(color=COLOR_SCHEME["text"]),
         xaxis=dict(
             showgrid=True,
@@ -821,6 +821,21 @@ def update_street_timeseries(mapClick, overflowClick):
             xanchor="right",
             x=1,
         ),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            range=[-10, max_y],
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
+        ),
     )
     return fig
 
@@ -906,7 +921,7 @@ def update_breakdown(clickData, selected_year):
             orientation="h",
             marker=dict(
                 color=combined["change"],
-                colorscale=[[0, "#E67E22"], [0.5, "#D3D3D3"], [1, "#2E86AB"]],
+                colorscale="PuOr",
                 cmid=0,
                 showscale=False,
             ),
@@ -920,8 +935,23 @@ def update_breakdown(clickData, selected_year):
         xaxis_title="Change in parking spots",
         yaxis_title="",
         margin=dict(l=150, r=20, t=20, b=40),
-        yaxis=dict(autorange="reversed", automargin=True, tickfont=dict(size=12)),
+        yaxis=dict(
+            autorange="reversed",
+            automargin=True,
+            tickfont=dict(size=12),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
+        ),
         hovermode="closest",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
     )
 
     title = f"Street capacity changes: {prev_year} → {clicked_year}"
@@ -1012,9 +1042,22 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
 
     fig.update_layout(
         xaxis_title="Raw occupancy (%)",
-        yaxis=dict(autorange="reversed"),
+        yaxis=dict(
+            autorange="reversed",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
+        ),
         margin=dict(l=150, r=20, t=20, b=40),
         hovermode="closest",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
     )
 
     return fig
