@@ -223,8 +223,8 @@ app.layout = html.Div(
                         dcc.Dropdown(
                             id="year-dropdown",
                             options=[{"label": int(y), "value": int(y)} for y in years],
-                            # Default to 2013 if present, otherwise fallback to earliest available year
-                            value=(2013 if 2013 in years else int(years[0])),
+                            # Default to 2025 if present, otherwise fallback to earliest available year
+                            value=(2025 if 2025 in years else int(years[0])),
                             clearable=False,
                             style={"width": "100px"},
                         ),
