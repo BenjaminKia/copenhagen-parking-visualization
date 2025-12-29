@@ -523,8 +523,6 @@ app.layout = html.Div(
                 ),
             ],
         ),
-        # Store to track which chart was clicked last
-        dcc.Store(id="last-clicked-chart", data=None),
     ],
 )
 
@@ -706,37 +704,15 @@ def update_map(selected_time, selected_year, selected_month, occ_range):
     return fig, summary
 
 
-# Track which chart was clicked last
-@app.callback(
-    Output("last-clicked-chart", "data"),
-    [
-        Input("map-graph", "clickData"),
-        Input("overflow-chart", "clickData"),
-        Input("capacity-breakdown-chart", "clickData"),
-    ],
-)
-def track_last_clicked(mapClick, overflowClick, breakdownClick):
-    """Track which chart was clicked most recently by checking which has valid point data."""
-    # Return the chart name that has the most recent click
-    if overflowClick is not None and len(overflowClick.get("points", [])) > 0:
-        return "overflow"
-    if breakdownClick is not None and len(breakdownClick.get("points", [])) > 0:
-        return "breakdown"
-    if mapClick is not None and len(mapClick.get("points", [])) > 0:
-        return "map"
-    return None
-
-
 @app.callback(
     Output("street-timeseries", "figure"),
     [
         Input("map-graph", "clickData"),
         Input("overflow-chart", "clickData"),
         Input("capacity-breakdown-chart", "clickData"),
-        Input("last-clicked-chart", "data"),
     ],
 )
-def update_street_timeseries(mapClick, overflowClick, breakdownClick, lastClicked):
+def update_street_timeseries(mapClick, overflowClick, breakdownClick):
     # If nothing clicked yet
     if overflowClick is None and mapClick is None and breakdownClick is None:
         fig = go.Figure()
@@ -757,11 +733,18 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick, lastClicke
         )
         return fig
 
-    # Use the lastClicked to determine which chart to read from
+    # Prefer breakdown click, then overflow chart click, then map click
     vej_id = None
     street_name = None
 
-    if lastClicked == "overflow" and overflowClick is not None:
+    if breakdownClick is not None:
+        try:
+            vej_id = breakdownClick["points"][0]["customdata"][0]
+            street_name = breakdownClick["points"][0]["y"]
+        except Exception:
+            vej_id = None
+
+    if vej_id is None and overflowClick is not None:
         try:
             customdata = overflowClick["points"][0]["customdata"]
             if isinstance(customdata, (list, tuple)) and len(customdata) >= 2:
@@ -772,20 +755,13 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick, lastClicke
         except Exception:
             street_name = None
 
-    elif lastClicked == "breakdown" and breakdownClick is not None:
-        try:
-            vej_id = breakdownClick["points"][0]["customdata"][0]
-            street_name = breakdownClick["points"][0]["y"]
-        except Exception:
-            vej_id = None
-
-    elif lastClicked == "map" and mapClick is not None:
+    if vej_id is None and mapClick is not None:
         try:
             vej_id = mapClick["points"][0]["customdata"]
         except Exception:
             vej_id = None
 
-    # If we have a street name but no vej_id, try to find it
+    # If we have a street name from overflow chart click but no vej_id, try to find it
     if street_name is not None and vej_id is None:
         vejname_match = df[df["vejnavn"] == street_name]
         if not vejname_match.empty:
