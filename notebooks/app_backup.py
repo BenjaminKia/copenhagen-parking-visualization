@@ -641,6 +641,8 @@ def update_map(
         )
         return fig, "No streets match the filters."
 
+    dff = dff.copy()
+
     # Scale capacities to reasonable marker sizes (e.g. 5–30)
     min_cap = capacity.min()
     max_cap = capacity.max()
@@ -668,6 +670,7 @@ def update_map(
         + capacity.astype(int).astype(str)
         + " spots"
     )
+    dff["hover_label"] = hover_text
     customdata_values = dff[["vej_id", "vejnavn"]].to_numpy()
 
     # 2: fig
@@ -690,7 +693,7 @@ def update_map(
                 colorbar=dict(title="Occupancy (%)", ticks="outside"),
                 opacity=0.8,
             ),
-            text=hover_text,
+            text=dff["hover_label"],
             hoverinfo="text",
             customdata=customdata_values,
         )
@@ -698,46 +701,79 @@ def update_map(
 
     # Determine if we should zoom to a specific street
     zoom_vej_id = None
+    zoom_street_name = None
     # Check if breakdown chart was clicked
     if breakdownClick is not None:
         try:
-            zoom_vej_id = breakdownClick["points"][0]["customdata"][0]
+            point = breakdownClick["points"][0]
+            customdata = point.get("customdata")
+            if (
+                isinstance(customdata, (list, tuple, np.ndarray))
+                and len(customdata) >= 1
+            ):
+                zoom_vej_id = customdata[0]
+            zoom_street_name = point.get("y")
         except Exception:
             pass
 
     # Check if overflow chart was clicked (only if breakdown wasn't clicked)
     if zoom_vej_id is None and overflowClick is not None:
         try:
-            customdata = overflowClick["points"][0]["customdata"]
-            if isinstance(customdata, (list, tuple)) and len(customdata) >= 1:
+            point = overflowClick["points"][0]
+            customdata = point.get("customdata")
+            if (
+                isinstance(customdata, (list, tuple, np.ndarray))
+                and len(customdata) >= 1
+            ):
                 zoom_vej_id = customdata[0]
+                if len(customdata) >= 2:
+                    zoom_street_name = customdata[1]
+            if zoom_street_name is None:
+                zoom_street_name = point.get("y")
         except Exception:
             pass
 
     # Determine map center and zoom
-    if zoom_vej_id is not None:
-        # Find the street data to get coordinates
-        if isinstance(zoom_vej_id, str) and zoom_vej_id.startswith("nan_"):
-            # Handle NaN vej_id case
-            street_data = df[df["vej_id"].isna()]
-        else:
-            street_data = df[df["vej_id"] == zoom_vej_id]
+    map_center_lat = 55.69
+    map_center_lon = 12.5683
+    map_zoom = 11
+    highlight_coords = None
 
-        if not street_data.empty:
-            # Calculate center point from street coordinates
-            map_center_lat = street_data["lat"].mean()
-            map_center_lon = street_data["lng"].mean()
-            map_zoom = 14
+    if isinstance(zoom_vej_id, (np.generic, np.ndarray)):
+        try:
+            zoom_vej_id = zoom_vej_id.item()
+        except Exception:
+            pass
+
+    if zoom_vej_id is not None:
+        if isinstance(zoom_vej_id, str) and zoom_vej_id.startswith("nan_"):
+            filtered_rows = dff[dff["vej_id"].isna()]
+            if zoom_street_name is not None:
+                filtered_rows = filtered_rows[
+                    filtered_rows["vejnavn"] == zoom_street_name
+                ]
+            street_data = df[df["vej_id"].isna()]
+            if zoom_street_name is not None:
+                street_data = street_data[street_data["vejnavn"] == zoom_street_name]
         else:
-            # Fallback to default
-            map_center_lat = 55.69
-            map_center_lon = 12.5683
-            map_zoom = 11
-    else:
-        # Default Copenhagen center
-        map_center_lat = 55.69
-        map_center_lon = 12.5683
-        map_zoom = 11
+            filtered_rows = dff[dff["vej_id"] == zoom_vej_id]
+            street_data = df[df["vej_id"] == zoom_vej_id]
+            if zoom_street_name is not None and filtered_rows.empty:
+                filtered_rows = dff[dff["vejnavn"] == zoom_street_name]
+                street_data = street_data[street_data["vejnavn"] == zoom_street_name]
+
+        target_rows = filtered_rows if not filtered_rows.empty else street_data
+
+        if not target_rows.empty:
+            map_center_lat = target_rows["lat"].mean()
+            map_center_lon = target_rows["lng"].mean()
+            map_zoom = 15.2
+            highlight_coords = (map_center_lat, map_center_lon)
+        # If both filtered and full data are empty we keep defaults
+
+    uirevision_value = (
+        f"parking-map-{zoom_vej_id}" if zoom_vej_id is not None else "parking-map"
+    )
 
     fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
@@ -747,8 +783,21 @@ def update_map(
             zoom=map_zoom,
             center=dict(lat=map_center_lat, lon=map_center_lon),
         ),
-        uirevision="parking-map",
+        uirevision=uirevision_value,
     )
+
+    if highlight_coords is not None:
+        highlight_lat, highlight_lon = highlight_coords
+        fig.add_trace(
+            go.Scattermapbox(
+                lat=[highlight_lat],
+                lon=[highlight_lon],
+                mode="markers",
+                marker=dict(size=26, color="#1F4E79", opacity=0.85),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
 
     summary = (
         f"{len(dff)} observations | "
