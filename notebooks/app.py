@@ -79,19 +79,22 @@ def make_capacity_figure():
     if cap_by_year.empty:
         return go.Figure()
 
+    trend_color = "#1F4E79"  # align with street occupancy trend blue
+    trend_fill = "rgba(31, 78, 121, 0.18)"
+
     fig = go.Figure(
         go.Scatter(
             x=cap_by_year["year"],
             y=cap_by_year["total_spots"],
             mode="lines+markers",
-            line=dict(color="#E67E22", width=3),
+            line=dict(color=trend_color, width=3),
             marker=dict(
                 size=10,
-                color="#E67E22",
+                color=trend_color,
                 line=dict(width=2, color="white"),
             ),
             fill="tozeroy",
-            fillcolor="rgba(230, 126, 34, 0.15)",
+            fillcolor=trend_fill,
             hovertemplate="<b>Year %{x}</b><br>Total spots: %{y:,.0f}<extra></extra>",
             name="Total parking spots",
         )
@@ -121,9 +124,7 @@ def make_capacity_figure():
         showlegend=False,
     )
 
-    fig.update_traces(
-        line=dict(color="#E67E22", width=2.5), fillcolor="rgba(230, 126, 34, 0.18)"
-    )
+    fig.update_traces(line=dict(color=trend_color, width=2.5), fillcolor=trend_fill)
 
     return fig
 
@@ -1091,17 +1092,23 @@ def update_breakdown(clickData, selected_year):
     # Create horizontal bar chart
     fig = go.Figure()
 
+    color_map = []
+    for value in combined["change"].tolist():
+        if value > 0:
+            color_map.append(
+                "#1F4E79"
+            )  # match street occupancy trend blue for increases
+        elif value < 0:
+            color_map.append("#E67E22")  # reuse street occupancy orange for decreases
+        else:
+            color_map.append("#6C757D")  # muted neutral for no change
+
     fig.add_trace(
         go.Bar(
             y=combined["vejnavn"],
             x=combined["change"],
             orientation="h",
-            marker=dict(
-                color=combined["change"],
-                colorscale="PuOr",
-                cmid=0,
-                showscale=False,
-            ),
+            marker=dict(color=color_map, line=dict(color="#FFFFFF", width=0.5)),
             customdata=combined[["vej_id", "capacity_prev", "capacity_curr"]],
             hovertemplate="<b>%{y}</b><br>Change: %{x:+.0f} spots<br>"
             + "Previous: %{customdata[1]:.0f} → Current: %{customdata[2]:.0f}<extra></extra>",
