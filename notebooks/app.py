@@ -667,6 +667,8 @@ def update_map(
         + capacity.astype(int).astype(str)
         + " spots"
     )
+    customdata_values = dff[["vej_id", "vejnavn"]].to_numpy()
+
     # 2: fig
     fig = go.Figure(
         go.Scattermapbox(
@@ -689,13 +691,12 @@ def update_map(
             ),
             text=hover_text,
             hoverinfo="text",
-            customdata=dff["vej_id"],
+            customdata=customdata_values,
         )
     )
 
     # Determine if we should zoom to a specific street
     zoom_vej_id = None
-
     # Check if breakdown chart was clicked
     if breakdownClick is not None:
         try:
@@ -813,7 +814,7 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick):
         except (KeyError, IndexError, TypeError):
             return None, None
         customdata = point.get("customdata")
-        if isinstance(customdata, (list, tuple)):
+        if isinstance(customdata, (list, tuple, np.ndarray)):
             if len(customdata) >= 2:
                 return customdata[0], customdata[1]
             if len(customdata) == 1:
@@ -827,7 +828,21 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick):
             point = click["points"][0]
         except (KeyError, IndexError, TypeError):
             return None, None
-        return point.get("customdata"), point.get("text")
+        customdata = point.get("customdata")
+        vej = None
+        street = None
+        if isinstance(customdata, (list, tuple)):
+            if customdata:
+                vej = customdata[0]
+            if len(customdata) >= 2:
+                street = customdata[1]
+        else:
+            vej = customdata
+        if street is None:
+            text = point.get("text")
+            if isinstance(text, str) and text.lower().startswith("street: "):
+                street = text.split("<br>", 1)[0][8:]
+        return vej, street
 
     sources = [
         ("capacity-breakdown-chart", breakdownClick, parse_breakdown),
