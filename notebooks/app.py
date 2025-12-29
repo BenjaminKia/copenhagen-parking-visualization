@@ -1,6 +1,5 @@
-from dash import Dash, dcc, html, callback_context
+from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
-import dash.exceptions
 
 import pandas as pd
 import numpy as np
@@ -454,42 +453,10 @@ app.layout = html.Div(
                                 ),
                             ],
                         ),
-                        # Cell 3: Streets with occupancy > 100%
+                        # Cell 3: Breakdown
                         html.Div(
                             style={
                                 "borderRight": f"1px solid {COLOR_SCHEME['border']}",
-                                "overflow": "hidden",
-                                "display": "flex",
-                                "flexDirection": "column",
-                            },
-                            children=[
-                                html.Div(
-                                    style={
-                                        "padding": "15px 20px",
-                                        "backgroundColor": COLOR_SCHEME["neutral"],
-                                    },
-                                    children=[
-                                        html.H3(
-                                            "Streets >100% Occupancy",
-                                            style={
-                                                "color": COLOR_SCHEME["primary"],
-                                                "margin": "0 0 5px 0",
-                                                "fontSize": "14px",
-                                                "fontWeight": "600",
-                                            },
-                                        )
-                                    ],
-                                ),
-                                dcc.Graph(
-                                    id="overflow-chart",
-                                    style={"height": "45vh", "margin": "0"},
-                                    config={"displaylogo": False},
-                                ),
-                            ],
-                        ),
-                        # Cell 4: Breakdown
-                        html.Div(
-                            style={
                                 "overflow": "hidden",
                                 "display": "flex",
                                 "flexDirection": "column",
@@ -515,6 +482,38 @@ app.layout = html.Div(
                                 ),
                                 dcc.Graph(
                                     id="capacity-breakdown-chart",
+                                    style={"height": "45vh", "margin": "0"},
+                                    config={"displaylogo": False},
+                                ),
+                            ],
+                        ),
+                        # Cell 4: Streets with occupancy > 100%
+                        html.Div(
+                            style={
+                                "overflow": "hidden",
+                                "display": "flex",
+                                "flexDirection": "column",
+                            },
+                            children=[
+                                html.Div(
+                                    style={
+                                        "padding": "15px 20px",
+                                        "backgroundColor": COLOR_SCHEME["neutral"],
+                                    },
+                                    children=[
+                                        html.H3(
+                                            "Streets >100% Occupancy",
+                                            style={
+                                                "color": COLOR_SCHEME["primary"],
+                                                "margin": "0 0 5px 0",
+                                                "fontSize": "14px",
+                                                "fontWeight": "600",
+                                            },
+                                        )
+                                    ],
+                                ),
+                                dcc.Graph(
+                                    id="overflow-chart",
                                     style={"height": "45vh", "margin": "0"},
                                     config={"displaylogo": False},
                                 ),
@@ -574,22 +573,12 @@ def get_year_breakdown(selected_year):
         Input("year-dropdown", "value"),
         Input("month-dropdown", "value"),
         Input("occ-slider", "value"),
-        Input("map-graph", "clickData"),
-        Input("overflow-chart", "clickData"),
-        Input("capacity-breakdown-chart", "clickData"),
     ],
 )
 
 # 4 update-functions
-def update_map(
-    selected_time,
-    selected_year,
-    selected_month,
-    occ_range,
-    mapClick,
-    overflowClick,
-    breakdownClick,
-):
+
+def update_map(selected_time, selected_year, selected_month, occ_range):
     cfg = TIME_CONFIG[selected_time]
     occ_col = cfg["occ_col"]
     cap_col = cfg["cap_col"]
@@ -695,57 +684,13 @@ def update_map(
         )
     )
 
-    # Determine map center based on clicked street
-    center_lat = 55.69
-    center_lon = 12.5683
-    zoom = 11
-
-    ctx = callback_context
-    if ctx.triggered:
-        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
-        vej_id = None
-        street_name = None
-
-        if trigger_id == "capacity-breakdown-chart" and breakdownClick is not None:
-            try:
-                street_name = breakdownClick["points"][0]["y"]
-            except Exception:
-                street_name = None
-        elif trigger_id == "overflow-chart" and overflowClick is not None:
-            try:
-                street_name = overflowClick["points"][0]["customdata"]
-            except Exception:
-                street_name = None
-        elif trigger_id == "map-graph" and mapClick is not None:
-            try:
-                vej_id = mapClick["points"][0]["customdata"]
-            except Exception:
-                vej_id = None
-
-        # Find the street in the dataframe
-        street_data = None
-        if street_name is not None:
-            street_data = df[df["vejnavn"] == street_name]
-        elif vej_id is not None:
-            # Handle the case where vej_id might be NaN
-            if isinstance(vej_id, str) and vej_id.startswith("nan_"):
-                street_data = df[df["vej_id"].isna()]
-            else:
-                street_data = df[df["vej_id"] == vej_id]
-
-        if street_data is not None and not street_data.empty:
-            center_lat = street_data["lat"].iloc[0]
-            center_lon = street_data["lng"].iloc[0]
-            zoom = 16
-
     fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
         mapbox=dict(
             accesstoken=MAPBOX_TOKEN,
             style="carto-positron",
-            zoom=zoom,
-            center=dict(lat=center_lat, lon=center_lon),
+            zoom=11,
+            center=dict(lat=55.69, lon=12.5683),  # Copenhagen center
         ),
         uirevision="parking-map",
     )
@@ -764,19 +709,11 @@ def update_map(
     [
         Input("map-graph", "clickData"),
         Input("overflow-chart", "clickData"),
-        Input("capacity-breakdown-chart", "clickData"),
     ],
 )
-def update_street_timeseries(mapClick, overflowClick, breakdownClick):
-    # Get which input triggered the callback
-    ctx = callback_context
-    if not ctx.triggered:
-        raise dash.exceptions.PreventUpdate
-
-    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
+def update_street_timeseries(mapClick, overflowClick):
     # If nothing clicked yet
-    if overflowClick is None and mapClick is None and breakdownClick is None:
+    if overflowClick is None and mapClick is None:
         fig = go.Figure()
         fig.update_layout(
             xaxis_title="Date",
@@ -795,43 +732,22 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick):
         )
         return fig
 
-    # Use the triggered input to determine which click to process
+    # Prefer overflow chart click (explicit list); fallback to map click
     vej_id = None
-    street_name = None
-
-    if trigger_id == "capacity-breakdown-chart" and breakdownClick is not None:
+    if overflowClick is not None:
         try:
-            street_name = breakdownClick["points"][0]["y"]
+            vej_id = overflowClick["points"][0]["customdata"]
         except Exception:
-            street_name = None
-    elif trigger_id == "overflow-chart" and overflowClick is not None:
-        try:
-            street_name = overflowClick["points"][0]["customdata"]
-        except Exception:
-            street_name = None
-    elif trigger_id == "map-graph" and mapClick is not None:
+            vej_id = None
+    if vej_id is None and mapClick is not None:
         try:
             vej_id = mapClick["points"][0]["customdata"]
         except Exception:
             vej_id = None
 
-    # If we have a street name from breakdown click, find the vej_id
-    if street_name is not None and vej_id is None:
-        vejname_match = df[df["vejnavn"] == street_name]
-        if not vejname_match.empty:
-            vej_id = vejname_match["vej_id"].iloc[0]
-
     # Handle NaN vej_id (e.g., Sankt Kjelds Plads)
-    # Check if vej_id is the special "nan_" string used for NaN vej_id in overflow chart
-    is_nan_vej_id = pd.isna(vej_id) or (
-        isinstance(vej_id, str) and vej_id.startswith("nan_")
-    )
-
-    if is_nan_vej_id:
+    if pd.isna(vej_id):
         dff_street = df[df["vej_id"].isna()].copy()
-        # If we have a street name, filter to just that street
-        if street_name is not None:
-            dff_street = dff_street[dff_street["vejnavn"] == street_name].copy()
     else:
         dff_street = df[df["vej_id"] == vej_id].copy()
     if dff_street.empty:
@@ -896,9 +812,7 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick):
                     name=label,
                     line=dict(color=colors[label], width=2),
                     marker=dict(size=8, color=colors[label]),
-                    customdata=dff_street["month"].astype(int),
                     hovertemplate=("%{x|%b %Y}<br>Occupancy: %{y:.0f}%<extra></extra>"),
-                    meta={"time": t},
                 )
             )
             max_y = max(max_y, y.max())
@@ -1161,7 +1075,7 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
                 ],
                 showscale=False,
             ),
-            customdata=top["vejnavn"].astype(str).tolist(),
+            customdata=top["vej_id"].astype(str).tolist(),
             hovertemplate="<b>%{y}</b><br>Occupancy: %{x:.1f}%<extra></extra>",
         )
     )
@@ -1187,32 +1101,6 @@ def update_overflow_chart(selected_time, selected_year, selected_month):
     )
 
     return fig
-
-
-@app.callback(
-    [
-        Output("time-dropdown", "value"),
-        Output("month-dropdown", "value"),
-    ],
-    Input("street-timeseries", "clickData"),
-)
-def update_filters_from_timeseries(clickData):
-    """Update time and month dropdowns when clicking on the trend view."""
-    if clickData is None:
-        raise dash.exceptions.PreventUpdate
-
-    try:
-        # Get the time from the trace metadata
-        trace_index = clickData["points"][0]["curveNumber"]
-        time_values = ["12", "17", "22"]
-        selected_time = time_values[trace_index]
-
-        # Get the month from customdata
-        selected_month = int(clickData["points"][0]["customdata"])
-
-        return selected_time, selected_month
-    except (KeyError, IndexError, ValueError, TypeError):
-        raise dash.exceptions.PreventUpdate
 
 
 if __name__ == "__main__":
