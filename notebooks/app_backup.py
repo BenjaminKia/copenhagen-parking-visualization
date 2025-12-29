@@ -84,14 +84,14 @@ def make_capacity_figure():
             x=cap_by_year["year"],
             y=cap_by_year["total_spots"],
             mode="lines+markers",
-            line=dict(color=COLOR_SCHEME["primary"], width=3),
+            line=dict(color="#E67E22", width=3),
             marker=dict(
                 size=10,
-                color=COLOR_SCHEME["primary"],
+                color="#E67E22",
                 line=dict(width=2, color="white"),
             ),
             fill="tozeroy",
-            fillcolor="rgba(46, 134, 171, 0.1)",
+            fillcolor="rgba(230, 126, 34, 0.15)",
             hovertemplate="<b>Year %{x}</b><br>Total spots: %{y:,.0f}<extra></extra>",
             name="Total parking spots",
         )
@@ -103,8 +103,8 @@ def make_capacity_figure():
         yaxis_title="Number of parking spots",
         hovermode="x unified",
         margin=dict(l=50, r=20, t=20, b=50),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
         font=dict(color=COLOR_SCHEME["text"]),
         xaxis=dict(
             showgrid=True,
@@ -120,6 +120,11 @@ def make_capacity_figure():
         ),
         showlegend=False,
     )
+
+    fig.update_traces(
+        line=dict(color="#E67E22", width=2.5), fillcolor="rgba(230, 126, 34, 0.18)"
+    )
+
     return fig
 
 
@@ -139,6 +144,9 @@ COLOR_SCHEME = {
     "success": "#06A77D",  # Green for gains
     "danger": "#D62246",  # Red for losses
     "neutral": "#F8F9FA",  # Light background
+    "background": "#FFFFFF",
+    "dark": "#2C3E50",
+    "warning": "#F1C40F",
     "text": "#2C3E50",  # Dark text
     "text_light": "#7F8C8D",  # Light text
     "border": "#E1E8ED",  # Subtle borders
@@ -148,7 +156,7 @@ COLOR_SCHEME = {
 app.layout = html.Div(
     style={
         "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": COLOR_SCHEME["background"],
         "color": COLOR_SCHEME["text"],
         "margin": "0",
         "padding": "0",
@@ -186,7 +194,7 @@ app.layout = html.Div(
         # Filter bar (dark horizontal) - sticky header so controls follow on scroll
         html.Div(
             style={
-                "backgroundColor": "#2C3E50",
+                "backgroundColor": COLOR_SCHEME["dark"],
                 "padding": "20px 30px",
                 "display": "flex",
                 "gap": "30px",
@@ -296,12 +304,12 @@ app.layout = html.Div(
                         html.Div(
                             style={"flex": "1"},
                             children=[
-                                dcc.Slider(
+                                dcc.RangeSlider(
                                     id="occ-slider",
                                     min=0,
                                     max=100,
                                     step=5,
-                                    value=100,
+                                    value=[0, 100],
                                     marks={i: f"{i}%" for i in range(0, 101, 20)},
                                     tooltip={
                                         "placement": "bottom",
@@ -318,7 +326,7 @@ app.layout = html.Div(
         html.Div(
             id="summary-text",
             style={
-                "backgroundColor": "#ECF0F1",
+                "backgroundColor": COLOR_SCHEME["neutral"],
                 "padding": "15px 30px",
                 "borderBottom": f"1px solid {COLOR_SCHEME['border']}",
                 "fontSize": "13px",
@@ -336,7 +344,7 @@ app.layout = html.Div(
                     style={
                         "padding": "15px 20px",
                         "borderBottom": f"1px solid {COLOR_SCHEME['border']}",
-                        "backgroundColor": "#F8F9FA",
+                        "backgroundColor": COLOR_SCHEME["neutral"],
                     },
                     children=[
                         html.H3(
@@ -390,7 +398,7 @@ app.layout = html.Div(
                                 html.Div(
                                     style={
                                         "padding": "15px 20px",
-                                        "backgroundColor": "#F8F9FA",
+                                        "backgroundColor": COLOR_SCHEME["neutral"],
                                     },
                                     children=[
                                         html.H3(
@@ -423,7 +431,7 @@ app.layout = html.Div(
                                 html.Div(
                                     style={
                                         "padding": "15px 20px",
-                                        "backgroundColor": "#F8F9FA",
+                                        "backgroundColor": COLOR_SCHEME["neutral"],
                                     },
                                     children=[
                                         html.H3(
@@ -445,7 +453,7 @@ app.layout = html.Div(
                                 ),
                             ],
                         ),
-                        # Cell 3: Breakdown
+                        # Cell 3: Streets with occupancy > 100%
                         html.Div(
                             style={
                                 "borderRight": f"1px solid {COLOR_SCHEME['border']}",
@@ -457,7 +465,39 @@ app.layout = html.Div(
                                 html.Div(
                                     style={
                                         "padding": "15px 20px",
-                                        "backgroundColor": "#F8F9FA",
+                                        "backgroundColor": COLOR_SCHEME["neutral"],
+                                    },
+                                    children=[
+                                        html.H3(
+                                            "Streets >100% Occupancy",
+                                            style={
+                                                "color": COLOR_SCHEME["primary"],
+                                                "margin": "0 0 5px 0",
+                                                "fontSize": "14px",
+                                                "fontWeight": "600",
+                                            },
+                                        )
+                                    ],
+                                ),
+                                dcc.Graph(
+                                    id="overflow-chart",
+                                    style={"height": "45vh", "margin": "0"},
+                                    config={"displaylogo": False},
+                                ),
+                            ],
+                        ),
+                        # Cell 4: Breakdown
+                        html.Div(
+                            style={
+                                "overflow": "hidden",
+                                "display": "flex",
+                                "flexDirection": "column",
+                            },
+                            children=[
+                                html.Div(
+                                    style={
+                                        "padding": "15px 20px",
+                                        "backgroundColor": COLOR_SCHEME["neutral"],
                                     },
                                     children=[
                                         html.H3(
@@ -477,24 +517,6 @@ app.layout = html.Div(
                                     style={"height": "45vh", "margin": "0"},
                                     config={"displaylogo": False},
                                 ),
-                            ],
-                        ),
-                        # Cell 4: Empty placeholder
-                        html.Div(
-                            style={
-                                "overflow": "hidden",
-                                "display": "flex",
-                                "alignItems": "center",
-                                "justifyContent": "center",
-                            },
-                            children=[
-                                html.Div(
-                                    "(Reserved for future visualization)",
-                                    style={
-                                        "color": COLOR_SCHEME["text_light"],
-                                        "fontSize": "14px",
-                                    },
-                                )
                             ],
                         ),
                     ],
@@ -538,7 +560,7 @@ def get_year_breakdown(selected_year):
     merged = merged.merge(vejnames, on="vej_id", how="left")
 
     merged["change"] = merged["capacity_curr"] - merged["capacity_prev"]
-    merged = merged[["vejnavn", "capacity_prev", "capacity_curr", "change"]]
+    merged = merged[["vej_id", "vejnavn", "capacity_prev", "capacity_curr", "change"]]
 
     return prev_year, merged
 
@@ -556,10 +578,12 @@ def get_year_breakdown(selected_year):
 
 # 4 update-functions
 
-def update_map(selected_time, selected_year, selected_month, max_occ):
+def update_map(selected_time, selected_year, selected_month, occ_range):
     cfg = TIME_CONFIG[selected_time]
     occ_col = cfg["occ_col"]
     cap_col = cfg["cap_col"]
+
+    min_occ, max_occ = occ_range
 
     # Filter by year + month
     dff = df.copy()
@@ -588,8 +612,8 @@ def update_map(selected_time, selected_year, selected_month, max_occ):
     occ = dff[occ_col].astype(float).clip(lower=0, upper=100)
     capacity = dff[cap_col].astype(float)
 
-    # Apply max occupancy filter
-    mask = occ <= max_occ
+    # Apply occupancy range filter
+    mask = (occ >= min_occ) & (occ <= max_occ)
     dff = dff[mask]
     occ = occ[mask]
     capacity = capacity[mask]
@@ -615,15 +639,20 @@ def update_map(selected_time, selected_year, selected_month, max_occ):
     else:
         sizes = 5 + 25 * (capacity - min_cap) / (max_cap - min_cap)
 
-    # Build hover text
+    # Build hover text with dynamic label for occupancy
+    occ_raw = dff[occ_col].astype(float)  # Get raw occupancy values
+    occ_label = occ_raw.apply(lambda x: "Raw occupancy:" if x > 100 else "Occupancy:")
+
     hover_text = (
         "Street: "
         + dff["vejnavn"].astype(str)
         # + "<br>Street ID: "
         # + dff["vej_id"].astype(str)
         + f"<br>Time: {cfg['label']}"
-        + "<br>Occupancy: "
-        + occ.round(1).astype(str)
+        + "<br>"
+        + occ_label
+        + " "
+        + occ_raw.round(1).astype(str)
         + " %"
         + "<br>Capacity: "
         + capacity.astype(int).astype(str)
@@ -642,9 +671,9 @@ def update_map(selected_time, selected_year, selected_month, max_occ):
                 cmin=0,
                 cmax=100,
                 colorscale=[
-                    [0, "#2ecc71"],
-                    [0.5, "#f1c40f"],
-                    [1, "#e74c3c"],
+                    [0, COLOR_SCHEME["success"]],
+                    [0.5, COLOR_SCHEME["warning"]],
+                    [1, COLOR_SCHEME["danger"]],
                 ],
                 colorbar=dict(title="Occupancy (%)", ticks="outside"),
                 opacity=0.8,
@@ -677,11 +706,15 @@ def update_map(selected_time, selected_year, selected_month, max_occ):
 
 @app.callback(
     Output("street-timeseries", "figure"),
-    Input("map-graph", "clickData"),
+    [
+        Input("map-graph", "clickData"),
+        Input("overflow-chart", "clickData"),
+        Input("capacity-breakdown-chart", "clickData"),
+    ],
 )
-def update_street_timeseries(clickData):
+def update_street_timeseries(mapClick, overflowClick, breakdownClick):
     # If nothing clicked yet
-    if clickData is None:
+    if overflowClick is None and mapClick is None and breakdownClick is None:
         fig = go.Figure()
         fig.update_layout(
             xaxis_title="Date",
@@ -700,11 +733,53 @@ def update_street_timeseries(clickData):
         )
         return fig
 
-    # Get vej_id from the clicked point
-    vej_id = clickData["points"][0]["customdata"]
+    # Prefer breakdown click, then overflow chart click, then map click
+    vej_id = None
+    street_name = None
 
-    # Filter all data for this street
-    dff_street = df[df["vej_id"] == vej_id].copy()
+    if breakdownClick is not None:
+        try:
+            vej_id = breakdownClick["points"][0]["customdata"][0]
+            street_name = breakdownClick["points"][0]["y"]
+        except Exception:
+            vej_id = None
+
+    if vej_id is None and overflowClick is not None:
+        try:
+            customdata = overflowClick["points"][0]["customdata"]
+            if isinstance(customdata, (list, tuple)) and len(customdata) >= 2:
+                vej_id = customdata[0]
+                street_name = customdata[1]
+            else:
+                street_name = overflowClick["points"][0]["y"]
+        except Exception:
+            street_name = None
+
+    if vej_id is None and mapClick is not None:
+        try:
+            vej_id = mapClick["points"][0]["customdata"]
+        except Exception:
+            vej_id = None
+
+    # If we have a street name from overflow chart click but no vej_id, try to find it
+    if street_name is not None and vej_id is None:
+        vejname_match = df[df["vejnavn"] == street_name]
+        if not vejname_match.empty:
+            vej_id = vejname_match["vej_id"].iloc[0]
+
+    # Handle NaN vej_id (e.g., Sankt Kjelds Plads)
+    # Check if vej_id is the special "nan_" string used for NaN vej_id in overflow chart
+    is_nan_vej_id = pd.isna(vej_id) or (
+        isinstance(vej_id, str) and vej_id.startswith("nan_")
+    )
+
+    if is_nan_vej_id:
+        dff_street = df[df["vej_id"].isna()].copy()
+        # If we have a street name, filter to just that street
+        if street_name is not None:
+            dff_street = dff_street[dff_street["vejnavn"] == street_name].copy()
+    else:
+        dff_street = df[df["vej_id"] == vej_id].copy()
     if dff_street.empty:
         fig = go.Figure()
         fig.update_layout(
@@ -748,6 +823,11 @@ def update_street_timeseries(clickData):
     # build time series (12, 17, 22)
     traces = []
     max_y = 0  # to scale y-axis depending on occupancy of that street
+    colors = {
+        "12:00": "#1F4E79",  # blue
+        "17:00": "#E67E22",  # orange
+        "22:00": "#1ABC9C",  # teal
+    }
     for t in ["12", "17", "22"]:
         occ_col = TIME_CONFIG[t]["occ_col"]
         label = TIME_CONFIG[t]["label"]
@@ -760,7 +840,8 @@ def update_street_timeseries(clickData):
                     y=y,
                     mode="lines+markers",
                     name=label,
-                    marker=dict(size=8),
+                    line=dict(color=colors[label], width=2),
+                    marker=dict(size=8, color=colors[label]),
                     hovertemplate=("%{x|%b %Y}<br>Occupancy: %{y:.0f}%<extra></extra>"),
                 )
             )
@@ -776,20 +857,37 @@ def update_street_timeseries(clickData):
     street_name = (
         dff_street["vejnavn"].iloc[0] if "vejnavn" in dff_street.columns else ""
     )
-    title = f"Occupancy over time - {street_name} (vej_id={vej_id})"
 
     fig = go.Figure(data=traces)
     fig.update_layout(
-        title=title,
+        title=street_name,
+        title_font_size=16,
+        title_x=0.05,
+        title_xanchor="left",
         xaxis_title="Date",
         yaxis_title="Occupancy (%)",
-        yaxis=dict(range=[-10, max_y]),
+        margin=dict(l=50, r=20, t=40, b=50),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
             x=1,
+        ),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            range=[-10, max_y],
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
         ),
     )
     return fig
@@ -835,7 +933,10 @@ def update_breakdown(clickData, selected_year):
                         font=dict(size=14, color=COLOR_SCHEME["text_light"]),
                     )
                 ],
-                margin=dict(l=200, r=20, t=20, b=40),
+                margin=dict(l=80, r=20, t=20, b=40),
+                yaxis=dict(
+                    autorange="reversed", automargin=True, tickfont=dict(size=12)
+                ),
             )
             title = f"Street capacity changes: {clicked_year}"
             # Match H3 title style used in layout
@@ -844,6 +945,7 @@ def update_breakdown(clickData, selected_year):
                 "color": COLOR_SCHEME["primary"],
                 "fontSize": "14px",
                 "fontWeight": "600",
+                "margin": "0 0 5px 0",
             }
             return title, h3_style, empty_fig
 
@@ -855,8 +957,8 @@ def update_breakdown(clickData, selected_year):
     losers = merged[merged["change"] < 0].nsmallest(10, "change")
     gainers = merged[merged["change"] > 0].nlargest(10, "change")
 
-    # Combine and sort
-    combined = pd.concat([losers, gainers]).sort_values("change")
+    # Combine and sort - gainers above losers (descending order)
+    combined = pd.concat([losers, gainers]).sort_values("change", ascending=False)
 
     if combined.empty:
         empty_fig = go.Figure()
@@ -872,21 +974,37 @@ def update_breakdown(clickData, selected_year):
             orientation="h",
             marker=dict(
                 color=combined["change"],
-                colorscale="RdYlGn",
+                colorscale="PuOr",
                 cmid=0,
                 showscale=False,
             ),
-            customdata=combined[["capacity_prev", "capacity_curr"]],
+            customdata=combined[["vej_id", "capacity_prev", "capacity_curr"]],
             hovertemplate="<b>%{y}</b><br>Change: %{x:+.0f} spots<br>"
-            + "Previous: %{customdata[0]:.0f} → Current: %{customdata[1]:.0f}<extra></extra>",
+            + "Previous: %{customdata[1]:.0f} → Current: %{customdata[2]:.0f}<extra></extra>",
         )
     )
 
     fig.update_layout(
         xaxis_title="Change in parking spots",
         yaxis_title="",
-        margin=dict(l=200, r=20, t=20, b=40),
+        margin=dict(l=150, r=20, t=20, b=40),
+        yaxis=dict(
+            autorange="reversed",
+            automargin=True,
+            tickfont=dict(size=12),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
+        ),
         hovermode="closest",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
     )
 
     title = f"Street capacity changes: {prev_year} → {clicked_year}"
@@ -895,8 +1013,124 @@ def update_breakdown(clickData, selected_year):
         "color": COLOR_SCHEME["primary"],
         "fontSize": "14px",
         "fontWeight": "600",
+        "margin": "0 0 5px 0",
     }
     return title, h3_style, fig
+
+
+@app.callback(
+    Output("overflow-chart", "figure"),
+    [
+        Input("time-dropdown", "value"),
+        Input("year-dropdown", "value"),
+        Input("month-dropdown", "value"),
+    ],
+)
+def update_overflow_chart(selected_time, selected_year, selected_month):
+    """Show streets with raw occupancy > 100% for chosen year/month/time."""
+    cfg = TIME_CONFIG[selected_time]
+    occ_col = cfg["occ_col"]
+
+    dff = df.copy()
+    if selected_year is not None:
+        dff = dff[dff["year"] == selected_year]
+    if selected_month is not None:
+        dff = dff[dff["month"] == selected_month]
+
+    dff = dff.dropna(subset=[occ_col])
+    if dff.empty:
+        fig = go.Figure()
+        fig.update_layout(
+            annotations=[
+                dict(
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
+                    text="No measurements for these filters",
+                    showarrow=False,
+                )
+            ]
+        )
+        return fig
+
+    dff["occ_raw"] = dff[occ_col].astype(float)
+
+    # Aggregate by vej_id to get max occupancy per street, handling duplicate street IDs
+    # For rows with NaN vej_id, create unique identifiers using index
+    dff_with_id = dff.copy()
+    nan_mask = dff_with_id["vej_id"].isna()
+    dff_with_id.loc[nan_mask, "vej_id"] = "nan_" + dff_with_id.loc[
+        nan_mask
+    ].index.astype(str)
+
+    dff_agg = (
+        dff_with_id.groupby("vej_id")
+        .agg({"occ_raw": "max", "vejnavn": "first"})
+        .reset_index()
+    )
+
+    over = dff_agg[dff_agg["occ_raw"] > 100].copy()
+    if over.empty:
+        fig = go.Figure()
+        fig.update_layout(
+            annotations=[
+                dict(
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
+                    text="No streets exceed 100% for these filters",
+                    showarrow=False,
+                )
+            ]
+        )
+        return fig
+
+    # Aggregate per street (vej_id) and sort
+    agg = over.sort_values("occ_raw", ascending=False)
+    top = agg.head(30)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=top["occ_raw"].astype(float),
+            y=top["vejnavn"].astype(str),
+            orientation="h",
+            marker=dict(
+                color=top["occ_raw"],
+                colorscale=[
+                    [0.0, "#F8B8C4"],  # lighter red
+                    [1.0, "#C41E3A"],  # dark red (similar to blue contrast)
+                ],
+                showscale=False,
+            ),
+            customdata=top[["vej_id", "vejnavn"]].values,
+            hovertemplate="<b>%{y}</b><br>Occupancy: %{x:.1f}%<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        xaxis_title="Occupancy (%)",
+        yaxis=dict(
+            autorange="reversed",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="rgba(0,0,0,0.05)",
+            zeroline=False,
+        ),
+        margin=dict(l=150, r=20, t=20, b=40),
+        hovermode="closest",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+    )
+
+    return fig
 
 
 if __name__ == "__main__":
