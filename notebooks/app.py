@@ -1,4 +1,4 @@
-from dash import Dash, dcc, html
+from dash import Dash, dcc, html, callback_context
 from dash.dependencies import Input, Output
 
 import pandas as pd
@@ -573,12 +573,21 @@ def get_year_breakdown(selected_year):
         Input("year-dropdown", "value"),
         Input("month-dropdown", "value"),
         Input("occ-slider", "value"),
+        Input("overflow-chart", "clickData"),
+        Input("capacity-breakdown-chart", "clickData"),
     ],
 )
 
 # 4 update-functions
 
-def update_map(selected_time, selected_year, selected_month, occ_range):
+def update_map(
+    selected_time,
+    selected_year,
+    selected_month,
+    occ_range,
+    overflowClick,
+    breakdownClick,
+):
     cfg = TIME_CONFIG[selected_time]
     occ_col = cfg["occ_col"]
     cap_col = cfg["cap_col"]
@@ -684,13 +693,57 @@ def update_map(selected_time, selected_year, selected_month, occ_range):
         )
     )
 
+    # Determine if we should zoom to a specific street
+    zoom_vej_id = None
+
+    # Check if breakdown chart was clicked
+    if breakdownClick is not None:
+        try:
+            zoom_vej_id = breakdownClick["points"][0]["customdata"][0]
+        except Exception:
+            pass
+
+    # Check if overflow chart was clicked (only if breakdown wasn't clicked)
+    if zoom_vej_id is None and overflowClick is not None:
+        try:
+            customdata = overflowClick["points"][0]["customdata"]
+            if isinstance(customdata, (list, tuple)) and len(customdata) >= 1:
+                zoom_vej_id = customdata[0]
+        except Exception:
+            pass
+
+    # Determine map center and zoom
+    if zoom_vej_id is not None:
+        # Find the street data to get coordinates
+        if isinstance(zoom_vej_id, str) and zoom_vej_id.startswith("nan_"):
+            # Handle NaN vej_id case
+            street_data = df[df["vej_id"].isna()]
+        else:
+            street_data = df[df["vej_id"] == zoom_vej_id]
+
+        if not street_data.empty:
+            # Calculate center point from street coordinates
+            map_center_lat = street_data["lat"].mean()
+            map_center_lon = street_data["lng"].mean()
+            map_zoom = 14
+        else:
+            # Fallback to default
+            map_center_lat = 55.69
+            map_center_lon = 12.5683
+            map_zoom = 11
+    else:
+        # Default Copenhagen center
+        map_center_lat = 55.69
+        map_center_lon = 12.5683
+        map_zoom = 11
+
     fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
         mapbox=dict(
             accesstoken=MAPBOX_TOKEN,
             style="carto-positron",
-            zoom=11,
-            center=dict(lat=55.69, lon=12.5683),  # Copenhagen center
+            zoom=map_zoom,
+            center=dict(lat=map_center_lat, lon=map_center_lon),
         ),
         uirevision="parking-map",
     )
@@ -733,33 +786,89 @@ def update_street_timeseries(mapClick, overflowClick, breakdownClick):
         )
         return fig
 
-    # Prefer breakdown click, then overflow chart click, then map click
+    ctx = callback_context
+    triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+
+    def parse_breakdown(click):
+        if not click:
+            return None, None
+        try:
+            point = click["points"][0]
+        except (KeyError, IndexError, TypeError):
+            return None, None
+        customdata = point.get("customdata")
+        vej = (
+            customdata[0]
+            if isinstance(customdata, (list, tuple)) and customdata
+            else None
+        )
+        street = point.get("y")
+        return vej, street
+
+    def parse_overflow(click):
+        if not click:
+            return None, None
+        try:
+            point = click["points"][0]
+        except (KeyError, IndexError, TypeError):
+            return None, None
+        customdata = point.get("customdata")
+        if isinstance(customdata, (list, tuple)):
+            if len(customdata) >= 2:
+                return customdata[0], customdata[1]
+            if len(customdata) == 1:
+                return customdata[0], point.get("y")
+        return None, point.get("y")
+
+    def parse_map(click):
+        if not click:
+            return None, None
+        try:
+            point = click["points"][0]
+        except (KeyError, IndexError, TypeError):
+            return None, None
+        return point.get("customdata"), point.get("text")
+
+    sources = [
+        ("capacity-breakdown-chart", breakdownClick, parse_breakdown),
+        ("overflow-chart", overflowClick, parse_overflow),
+        ("map-graph", mapClick, parse_map),
+    ]
+
+    if triggered_id:
+        ordered_sources = [s for s in sources if s[0] == triggered_id] + [
+            s for s in sources if s[0] != triggered_id
+        ]
+    else:
+        ordered_sources = sources
+
     vej_id = None
     street_name = None
+    for _, clickDataSource, extractor in ordered_sources:
+        candidate_id, candidate_name = extractor(clickDataSource)
+        if candidate_id is not None or candidate_name is not None:
+            vej_id = candidate_id
+            street_name = candidate_name
+            break
 
-    if breakdownClick is not None:
-        try:
-            vej_id = breakdownClick["points"][0]["customdata"][0]
-            street_name = breakdownClick["points"][0]["y"]
-        except Exception:
-            vej_id = None
-
-    if vej_id is None and overflowClick is not None:
-        try:
-            customdata = overflowClick["points"][0]["customdata"]
-            if isinstance(customdata, (list, tuple)) and len(customdata) >= 2:
-                vej_id = customdata[0]
-                street_name = customdata[1]
-            else:
-                street_name = overflowClick["points"][0]["y"]
-        except Exception:
-            street_name = None
-
-    if vej_id is None and mapClick is not None:
-        try:
-            vej_id = mapClick["points"][0]["customdata"]
-        except Exception:
-            vej_id = None
+    if vej_id is None and street_name is None:
+        fig = go.Figure()
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Occupancy (%)",
+            yaxis=dict(range=[0, 100]),
+            annotations=[
+                dict(
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
+                    text="Click a street on the map to see its history",
+                    showarrow=False,
+                )
+            ],
+        )
+        return fig
 
     # If we have a street name from overflow chart click but no vej_id, try to find it
     if street_name is not None and vej_id is None:
