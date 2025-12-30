@@ -1,5 +1,5 @@
 from dash import Dash, dcc, html, callback_context
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 
 import pandas as pd
 import numpy as np
@@ -31,6 +31,20 @@ df = df.dropna(subset=["lat", "lng"])
 # Dropdown options
 years = sorted(df["year"].dropna().unique())
 months = sorted(df["month"].dropna().unique())
+MONTH_LABELS = {
+    1: "January",
+    2: "February",
+    3: "March",
+    4: "April",
+    5: "May",
+    6: "June",
+    7: "July",
+    8: "August",
+    9: "September",
+    10: "October",
+    11: "November",
+    12: "December",
+}
 
 # map time of day to relevant columns
 TIME_CONFIG = {
@@ -246,7 +260,11 @@ app.layout = html.Div(
                         dcc.Dropdown(
                             id="month-dropdown",
                             options=[
-                                {"label": int(m), "value": int(m)} for m in months
+                                {
+                                    "label": MONTH_LABELS.get(int(m), str(int(m))),
+                                    "value": int(m),
+                                }
+                                for m in months
                             ],
                             value=int(months[0]),
                             clearable=False,
@@ -526,6 +544,32 @@ app.layout = html.Div(
         ),
     ],
 )
+
+
+@app.callback(
+    [Output("month-dropdown", "options"), Output("month-dropdown", "value")],
+    [Input("year-dropdown", "value")],
+    [State("month-dropdown", "value")],
+)
+def update_month_dropdown(selected_year, current_month):
+    if selected_year is None:
+        month_series = df["month"].dropna()
+    else:
+        month_series = df.loc[df["year"] == selected_year, "month"].dropna()
+
+    unique_months = sorted({int(m) for m in month_series})
+
+    options = [
+        {"label": MONTH_LABELS.get(m, str(m)), "value": m} for m in unique_months
+    ]
+
+    if not options:
+        return [], None
+
+    valid_values = [opt["value"] for opt in options]
+    new_value = current_month if current_month in valid_values else valid_values[0]
+
+    return options, new_value
 
 
 def get_year_breakdown(selected_year):
